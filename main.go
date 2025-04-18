@@ -20,6 +20,15 @@ func (g *GoCache) Get(key string) string {
 	return g.cache[key]
 }
 
+func (g *GoCache) Del(key string) {
+	delete(g.cache, key)
+}
+
+func (g *GoCache) Exists(key string) bool {
+	_, exists := g.cache[key]
+	return exists
+}
+
 func main() {
 	fmt.Println("Hello world!")
 
@@ -27,4 +36,8 @@ func main() {
 	g.Set("hello", "world")
 	fmt.Println(g)
 	fmt.Println(g.Get("hello"))
+	fmt.Println(g.Exists("hello"))
+	g.Del("hello")
+	fmt.Println(g.Exists("hello"))
+	fmt.Println(g)
 }
