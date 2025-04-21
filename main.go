@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"container/list"
 	"time"
 )
 
@@ -13,32 +13,69 @@ const (
 	Hour
 )
 
-type CacheItem struct {
+type cacheItem struct {
 	data      string
 	expiresAt time.Time
 }
 
-type GoCache struct {
-	Cache map[string]*CacheItem
+type cacheEntry struct {
+	key   string
+	value *cacheItem
 }
 
-func NewGoCache() *GoCache {
+type GoCache struct {
+	Capacity uint
+	Cache    map[string]*list.Element
+	order    *list.List
+}
+
+func NewGoCache(capacity uint) *GoCache {
 	return &GoCache{
-		make(map[string]*CacheItem),
+		Capacity: capacity,
+		Cache:    make(map[string]*list.Element),
+		order:    list.New(),
+	}
+}
+
+func (g *GoCache) newEntry(key, value string, expiresAt time.Time) {
+	item := &cacheItem{
+		data:      value,
+		expiresAt: expiresAt,
+	}
+
+	entry := &cacheEntry{
+		key:   key,
+		value: item,
+	}
+
+	elem := g.order.PushFront(entry)
+	g.Cache[key] = elem
+
+	if g.order.Len() > int(g.Capacity) {
+		back := g.order.Back()
+
+		if back != nil {
+			g.order.Remove(back)
+			entry := back.Value.(*cacheEntry)
+			delete(g.Cache, entry.key)
+		}
 	}
 }
 
 func (g *GoCache) Set(key, value string) {
-	if _, exists := g.Cache[key]; !exists {
-		g.Cache[key] = &CacheItem{}
+	if elem, exists := g.Cache[key]; exists {
+		newItem := elem.Value.(*cacheEntry)
+		newItem.value.data = value
+		g.order.MoveToFront(elem)
+		return
 	}
 
-	g.Cache[key].data = value
+	g.newEntry(key, value, time.Time{})
 }
 
 func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
-	if _, exists := g.Cache[key]; !exists {
-		g.Cache[key] = &CacheItem{}
+	if _, exists := g.Cache[key]; exists {
+		g.Del(key)
 	}
 
 	var duration time.Duration
@@ -54,35 +91,46 @@ func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
 		duration = time.Duration(ttl) * time.Second
 	}
 
-	g.Cache[key].data = value
-	g.Cache[key].expiresAt = time.Now().Add(duration)
+	expiresAt := time.Now().Add(duration)
+
+	g.newEntry(key, value, expiresAt)
 }
 
 func (g *GoCache) Get(key string) string {
-	item, exists := g.Cache[key]
+	elem, exists := g.Cache[key]
 
 	if !exists {
 		return ""
 	}
 
+	item := elem.Value.(*cacheEntry).value
+
 	if !item.expiresAt.IsZero() && time.Now().After(item.expiresAt) {
+		g.order.Remove(elem)
 		delete(g.Cache, key)
 		return ""
 	}
 
-	return g.Cache[key].data
+	g.order.MoveToFront(elem)
+
+	return item.data
 }
 
 func (g *GoCache) Del(key string) {
-	delete(g.Cache, key)
+	if elem, exists := g.Cache[key]; exists {
+		g.order.Remove(elem)
+		delete(g.Cache, key)
+	}
 }
 
 func (g *GoCache) Exists(key string) bool {
-	item, exists := g.Cache[key]
+	elem, exists := g.Cache[key]
 
 	if !exists {
 		return false
 	}
+
+	item := elem.Value.(*cacheEntry).value
 
 	if !item.expiresAt.IsZero() && time.Now().After(item.expiresAt) {
 		delete(g.Cache, key)
@@ -93,20 +141,5 @@ func (g *GoCache) Exists(key string) bool {
 }
 
 func main() {
-	fmt.Println("Hello world!")
 
-	g := NewGoCache()
-	g.Set("hello", "world")
-	fmt.Println(g)
-	fmt.Println(g.Get("hello"))
-	fmt.Println(g.Exists("hello"))
-	g.Del("hello")
-	fmt.Println(g.Exists("hello"))
-	fmt.Println(g)
-	g.SetWithTTL("world", "my", 1, Second)
-	fmt.Println(g)
-
-	fmt.Println(g.Get("world"))
-	time.Sleep(2 * time.Second)
-	fmt.Println(g.Get("world"))
 }
