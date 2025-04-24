@@ -1,7 +1,8 @@
-package main
+package cache
 
 import (
 	"container/list"
+	"sync"
 	"time"
 )
 
@@ -27,6 +28,7 @@ type GoCache struct {
 	Capacity uint
 	Cache    map[string]*list.Element
 	order    *list.List
+	mutex    sync.Mutex
 }
 
 func NewGoCache(capacity uint) *GoCache {
@@ -48,6 +50,9 @@ func (g *GoCache) newEntry(key, value string, expiresAt time.Time) {
 		value: item,
 	}
 
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
 	elem := g.order.PushFront(entry)
 	g.Cache[key] = elem
 
@@ -63,20 +68,23 @@ func (g *GoCache) newEntry(key, value string, expiresAt time.Time) {
 }
 
 func (g *GoCache) Set(key, value string) {
+	g.mutex.Lock()
+
 	if elem, exists := g.Cache[key]; exists {
 		newItem := elem.Value.(*cacheEntry)
 		newItem.value.data = value
 		g.order.MoveToFront(elem)
+		g.mutex.Unlock()
 		return
 	}
+
+	g.mutex.Unlock()
 
 	g.newEntry(key, value, time.Time{})
 }
 
 func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
-	if _, exists := g.Cache[key]; exists {
-		g.Del(key)
-	}
+	g.Del(key)
 
 	var duration time.Duration
 
@@ -97,11 +105,18 @@ func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
 }
 
 func (g *GoCache) Get(key string) string {
+	g.mutex.Lock()
+
 	elem, exists := g.Cache[key]
+
+	g.mutex.Unlock()
 
 	if !exists {
 		return ""
 	}
+
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
 	item := elem.Value.(*cacheEntry).value
 
@@ -117,6 +132,9 @@ func (g *GoCache) Get(key string) string {
 }
 
 func (g *GoCache) Del(key string) {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
 	if elem, exists := g.Cache[key]; exists {
 		g.order.Remove(elem)
 		delete(g.Cache, key)
@@ -124,6 +142,9 @@ func (g *GoCache) Del(key string) {
 }
 
 func (g *GoCache) Exists(key string) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
 	elem, exists := g.Cache[key]
 
 	if !exists {
@@ -133,13 +154,10 @@ func (g *GoCache) Exists(key string) bool {
 	item := elem.Value.(*cacheEntry).value
 
 	if !item.expiresAt.IsZero() && time.Now().After(item.expiresAt) {
+		g.order.Remove(elem)
 		delete(g.Cache, key)
 		return false
 	}
 
 	return true
-}
-
-func main() {
-
 }
