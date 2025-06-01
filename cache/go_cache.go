@@ -1,12 +1,9 @@
 package cache
 
 import (
-	"container/list"
 	"sync"
 	"time"
 )
-
-type TimeUnit int
 
 const (
 	Second TimeUnit = iota
@@ -14,78 +11,50 @@ const (
 	Hour
 )
 
-type cacheItem struct {
-	data      string
-	expiresAt time.Time
-}
-
 type cacheEntry struct {
-	key   string
-	value *cacheItem
+	value     string
+	expiresAt time.Time
 }
 
 type GoCache struct {
 	Capacity uint
-	Cache    map[string]*list.Element
-	order    *list.List
+	Cache    map[string]*cacheEntry
+	policy   EvictionPolicy
 	mutex    sync.Mutex
 }
 
-func NewGoCache(capacity uint) *GoCache {
+func NewGoCache(capacity uint, policy EvictionPolicy) *GoCache {
 	return &GoCache{
 		Capacity: capacity,
-		Cache:    make(map[string]*list.Element),
-		order:    list.New(),
+		Cache:    make(map[string]*cacheEntry),
+		policy:   policy,
 	}
 }
 
-func (g *GoCache) newEntry(key, value string, expiresAt time.Time) {
-	item := &cacheItem{
-		data:      value,
+func (cache *GoCache) newEntry(key, value string, expiresAt time.Time) {
+	entry := &cacheEntry{
+		value:     value,
 		expiresAt: expiresAt,
 	}
 
-	entry := &cacheEntry{
-		key:   key,
-		value: item,
-	}
+	cache.Cache[key] = entry
+	cache.policy.OnSet(key)
 
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	elem := g.order.PushFront(entry)
-	g.Cache[key] = elem
-
-	if g.order.Len() > int(g.Capacity) {
-		back := g.order.Back()
-
-		if back != nil {
-			g.order.Remove(back)
-			entry := back.Value.(*cacheEntry)
-			delete(g.Cache, entry.key)
+	if cache.policy.Len() > int(cache.Capacity) {
+		if evictedKey, found := cache.policy.Evict(); found {
+			delete(cache.Cache, evictedKey)
 		}
 	}
 }
 
-func (g *GoCache) Set(key, value string) {
-	g.mutex.Lock()
+func (cache *GoCache) Set(key, value string) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
 
-	if elem, exists := g.Cache[key]; exists {
-		newItem := elem.Value.(*cacheEntry)
-		newItem.value.data = value
-		g.order.MoveToFront(elem)
-		g.mutex.Unlock()
-		return
-	}
-
-	g.mutex.Unlock()
-
-	g.newEntry(key, value, time.Time{})
+	cache.newEntry(key, value, time.Time{})
 }
 
-func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
-	g.Del(key)
-
+func (cache *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
 	var duration time.Duration
 
 	switch unit {
@@ -101,61 +70,56 @@ func (g *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
 
 	expiresAt := time.Now().Add(duration)
 
-	g.newEntry(key, value, expiresAt)
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+
+	cache.newEntry(key, value, expiresAt)
 }
 
-func (g *GoCache) Get(key string) string {
-	g.mutex.Lock()
+func (cache *GoCache) Get(key string) (string, bool) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
 
-	elem, exists := g.Cache[key]
-
-	g.mutex.Unlock()
+	elem, exists := cache.Cache[key]
 
 	if !exists {
-		return ""
+		return "", false
 	}
 
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	item := elem.Value.(*cacheEntry).value
-
-	if !item.expiresAt.IsZero() && time.Now().After(item.expiresAt) {
-		g.order.Remove(elem)
-		delete(g.Cache, key)
-		return ""
+	if !elem.expiresAt.IsZero() && time.Now().After(elem.expiresAt) {
+		cache.policy.Remove(key)
+		delete(cache.Cache, key)
+		return "", false
 	}
 
-	g.order.MoveToFront(elem)
+	cache.policy.OnGet(key)
 
-	return item.data
+	return cache.Cache[key].value, true
 }
 
-func (g *GoCache) Del(key string) {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
+func (cache *GoCache) Del(key string) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
 
-	if elem, exists := g.Cache[key]; exists {
-		g.order.Remove(elem)
-		delete(g.Cache, key)
+	if _, exists := cache.Cache[key]; exists {
+		cache.policy.Remove(key)
+		delete(cache.Cache, key)
 	}
 }
 
-func (g *GoCache) Exists(key string) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
+func (cache *GoCache) Exists(key string) bool {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
 
-	elem, exists := g.Cache[key]
+	elem, exists := cache.Cache[key]
 
 	if !exists {
 		return false
 	}
 
-	item := elem.Value.(*cacheEntry).value
-
-	if !item.expiresAt.IsZero() && time.Now().After(item.expiresAt) {
-		g.order.Remove(elem)
-		delete(g.Cache, key)
+	if !elem.expiresAt.IsZero() && time.Now().After(elem.expiresAt) {
+		cache.policy.Remove(key)
+		delete(cache.Cache, key)
 		return false
 	}
 

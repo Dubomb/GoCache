@@ -8,10 +8,10 @@ import (
 )
 
 func TestSetGet(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key", "value")
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "value" {
 		t.Errorf("expected value to be \"value\", got '%s'", value)
@@ -19,11 +19,11 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestSet_KeyExists(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key", "value1")
 	cache.Set("key", "value2")
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "value2" {
 		t.Errorf("expected value to be \"value\", got '%s'", value)
@@ -31,7 +31,7 @@ func TestSet_KeyExists(t *testing.T) {
 }
 
 func TestSet_Concurrent(t *testing.T) {
-	cache := NewGoCache(500)
+	cache := NewGoCache(500, NewLRUPolicy())
 
 	var wg sync.WaitGroup
 
@@ -46,15 +46,15 @@ func TestSet_Concurrent(t *testing.T) {
 
 	wg.Wait()
 
-	if cache.order.Len() != 500 {
+	if cache.policy.Len() != 500 {
 		t.Errorf("not concurrent")
 	}
 }
 
 func TestGet_NonExistentKey(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
-	value := cache.Get("missing-key")
+	value, _ := cache.Get("missing-key")
 
 	if value != "" {
 		t.Errorf("expected empty string for non-existent key, got '%s'", value)
@@ -62,13 +62,13 @@ func TestGet_NonExistentKey(t *testing.T) {
 }
 
 func TestSetWithTTLGet_KeyExpired(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.SetWithTTL("key", "value", 1, Second)
 
 	time.Sleep(2 * time.Second)
 
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "" {
 		t.Errorf("expected empty string for expired key, got '%s'", value)
@@ -76,11 +76,11 @@ func TestSetWithTTLGet_KeyExpired(t *testing.T) {
 }
 
 func TestSetWithTTL(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.SetWithTTL("key", "value1", 1, Second)
 
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "value1" {
 		t.Errorf("expected value to be \"value\", got '%s'", value)
@@ -88,11 +88,11 @@ func TestSetWithTTL(t *testing.T) {
 }
 
 func TestSetWithTTL_KeyExists(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.SetWithTTL("key", "value1", 1, Second)
 	cache.SetWithTTL("key", "value2", 1, Second)
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "value2" {
 		t.Errorf("expected value to be \"value\", got '%s'", value)
@@ -100,13 +100,13 @@ func TestSetWithTTL_KeyExists(t *testing.T) {
 }
 
 func TestSetWithTTL_InvalidTime(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.SetWithTTL("key", "value1", 1, 5)
 
 	time.Sleep(2 * time.Second)
 
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "" {
 		t.Errorf("expected empty string for expired key, got '%s'", value)
@@ -114,13 +114,13 @@ func TestSetWithTTL_InvalidTime(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key", "value")
 
 	cache.Del("key")
 
-	value := cache.Get("key")
+	value, _ := cache.Get("key")
 
 	if value != "" {
 		t.Errorf("expected emptry string after delete, got '%s'", value)
@@ -128,7 +128,7 @@ func TestDel(t *testing.T) {
 }
 
 func TestExists(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key", "value")
 
@@ -138,7 +138,7 @@ func TestExists(t *testing.T) {
 }
 
 func TestExists_KeyExpired(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.SetWithTTL("key", "value1", 0, Second)
 
@@ -150,7 +150,7 @@ func TestExists_KeyExpired(t *testing.T) {
 }
 
 func TestNotExists(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key", "value")
 	cache.Del("key")
@@ -161,7 +161,7 @@ func TestNotExists(t *testing.T) {
 }
 
 func TestLRU(t *testing.T) {
-	cache := NewGoCache(1)
+	cache := NewGoCache(1, NewLRUPolicy())
 
 	cache.Set("key1", "value1")
 	cache.Set("key2", "value2")
