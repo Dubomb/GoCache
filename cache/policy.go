@@ -3,9 +3,7 @@ package cache
 type TimeUnit int
 
 type EvictionPolicy interface {
-	OnSet(key, value string)
-
-	OnSetWithTTL(key, value string, ttl uint, unit TimeUnit)
+	OnSet(key string)
 
 	Evict() string
 
