@@ -5,7 +5,7 @@ type TimeUnit int
 type EvictionPolicy interface {
 	OnSet(key string)
 
-	Evict() string
+	Evict() (string, bool)
 
 	Remove(key string)
 
