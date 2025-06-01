@@ -22,6 +22,14 @@ func NewLRUPolicy() EvictionPolicy {
 	}
 }
 
+func (lru *lruPolicy) OnGet(key string) {
+	lru.mutex.Lock()
+	defer lru.mutex.Unlock()
+
+	elem := lru.cache[key]
+	lru.order.MoveToFront(elem)
+}
+
 func (lru *lruPolicy) OnSet(key string) {
 	lru.mutex.Lock()
 	defer lru.mutex.Unlock()
