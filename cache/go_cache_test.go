@@ -176,3 +176,64 @@ func TestLRU(t *testing.T) {
 		t.Errorf("expected key1 to exist, but Exists returned false")
 	}
 }
+
+func TestLFU(t *testing.T) {
+	cache := NewGoCache(2, NewLFUPolicy())
+
+	cache.Set("key1", "value1")
+	cache.Get("key1")
+	cache.Set("key2", "value2")
+
+	cache.Set("key3", "value3")
+
+	if exists := cache.Exists("key1"); !exists {
+		t.Errorf("expected key1 to exist, but Exists returned false")
+	}
+
+	if exists := cache.Exists("key2"); exists {
+		t.Errorf("expected key2 to be evicted, but Exists returned true")
+	}
+
+	if exists := cache.Exists("key3"); !exists {
+		t.Errorf("expected key3 to exist, but Exists returned false")
+	}
+}
+
+func TestLFUTiebreaker(t *testing.T) {
+	cache := NewGoCache(3, NewLFUPolicy())
+
+	cache.Set("key1", "value1")
+	cache.Set("key2", "value2")
+	cache.Set("key3", "value3")
+	cache.Set("key1", "value1again")
+
+	cache.Set("key4", "value4")
+
+	if exists := cache.Exists("key1"); !exists {
+		t.Errorf("expected key1 to exist, but Exists returned false")
+	}
+
+	if exists := cache.Exists("key2"); exists {
+		t.Errorf("expected key2 to be evicted, but Exists returned true")
+	}
+
+	if exists := cache.Exists("key3"); !exists {
+		t.Errorf("expected key3 to exist, but Exists returned false")
+	}
+
+	if exists := cache.Exists("key4"); !exists {
+		t.Errorf("expected key4 to exist, but Exists returned false")
+	}
+}
+
+func TestLFURemove(t *testing.T) {
+	cache := NewGoCache(3, NewLFUPolicy())
+
+	cache.Set("key1", "value1")
+
+	cache.Del("key1")
+
+	if exists := cache.Exists("key1"); exists {
+		t.Errorf("expected key1 to be removed, but Exists returned true")
+	}
+}
