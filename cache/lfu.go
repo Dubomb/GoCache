@@ -2,6 +2,7 @@ package cache
 
 import (
 	"container/list"
+	"sync"
 )
 
 type lfuItem struct {
@@ -14,6 +15,7 @@ type lfuPolicy struct {
 	order   map[int]*list.List
 	minFreq int
 	size    int
+	mutex   sync.Mutex
 }
 
 func NewLFUPolicy() EvictionPolicy {
@@ -26,6 +28,9 @@ func NewLFUPolicy() EvictionPolicy {
 }
 
 func (lfu *lfuPolicy) OnGet(key string) {
+	lfu.mutex.Lock()
+	defer lfu.mutex.Unlock()
+
 	elem := lfu.cache[key]
 	item := elem.Value.(*lfuItem)
 
@@ -46,6 +51,9 @@ func (lfu *lfuPolicy) OnGet(key string) {
 }
 
 func (lfu *lfuPolicy) OnSet(key string) {
+	lfu.mutex.Lock()
+	defer lfu.mutex.Unlock()
+
 	if elem, exists := lfu.cache[key]; exists {
 		item := elem.Value.(*lfuItem)
 
@@ -84,6 +92,9 @@ func (lfu *lfuPolicy) OnSet(key string) {
 }
 
 func (lfu *lfuPolicy) Evict() (string, bool) {
+	lfu.mutex.Lock()
+	defer lfu.mutex.Unlock()
+
 	leastFreqOrder := lfu.order[lfu.minFreq]
 
 	back := leastFreqOrder.Back()
@@ -104,6 +115,9 @@ func (lfu *lfuPolicy) Evict() (string, bool) {
 }
 
 func (lfu *lfuPolicy) Remove(key string) {
+	lfu.mutex.Lock()
+	defer lfu.mutex.Unlock()
+
 	if elem, exists := lfu.cache[key]; exists {
 		freq := elem.Value.(*lfuItem).freq
 		lfu.order[freq].Remove(elem)
