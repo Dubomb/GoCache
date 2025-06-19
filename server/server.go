@@ -27,7 +27,6 @@ func main() {
 			continue
 		}
 
-		fmt.Println("Success!")
-		conn.Close()
+		go handleClientConnection(conn)
 	}
 }
