@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"gocache/parser"
 	"io"
 	"net"
 )
@@ -27,6 +28,13 @@ func handleClientConnection(conn net.Conn) {
 			return
 		}
 
-		fmt.Println("Message: ", msg)
+		command, err := parser.ParseCommand(msg)
+
+		if err == nil {
+			fmt.Println("Type: ", command.Type, " Args: ", command.Args)
+		} else {
+			fmt.Println("Error encountered: ", err)
+		}
+
 	}
 }
