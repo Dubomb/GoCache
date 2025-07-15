@@ -3,12 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"gocache/cache"
 	"gocache/parser"
 	"io"
 	"net"
 )
 
-func handleClientConnection(conn net.Conn) {
+func handleClientConnection(conn net.Conn, cache *cache.GoCache) {
 	defer conn.Close()
 
 	fmt.Println("Connection accepted from: ", conn.RemoteAddr())
