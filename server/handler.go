@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"gocache/cache"
+	"gocache/evaluator"
 	"gocache/parser"
 	"io"
 	"net"
@@ -31,11 +32,13 @@ func handleClientConnection(conn net.Conn, cache *cache.GoCache) {
 
 		command, err := parser.ParseCommand(msg)
 
-		if err == nil {
-			fmt.Println("Type: ", command.Type, " Args: ", command.Args)
-		} else {
-			fmt.Println("Error encountered: ", err)
+		if err != nil {
+			fmt.Println("Error while parsing: ", err)
+			continue
 		}
 
+		result := evaluator.Evaluate(command, cache)
+
+		conn.Write([]byte(fmt.Sprintf("%s\r\n", result)))
 	}
 }
