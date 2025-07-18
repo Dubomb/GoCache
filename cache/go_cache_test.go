@@ -64,7 +64,7 @@ func TestGet_NonExistentKey(t *testing.T) {
 func TestSetWithTTLGet_KeyExpired(t *testing.T) {
 	cache := NewGoCache(1, NewLRUPolicy())
 
-	cache.SetWithTTL("key", "value", 1, Second)
+	cache.SetWithTTL("key", "value", 1)
 
 	time.Sleep(2 * time.Second)
 
@@ -78,7 +78,7 @@ func TestSetWithTTLGet_KeyExpired(t *testing.T) {
 func TestSetWithTTL(t *testing.T) {
 	cache := NewGoCache(1, NewLRUPolicy())
 
-	cache.SetWithTTL("key", "value1", 1, Second)
+	cache.SetWithTTL("key", "value1", 1)
 
 	value, _ := cache.Get("key")
 
@@ -90,26 +90,12 @@ func TestSetWithTTL(t *testing.T) {
 func TestSetWithTTL_KeyExists(t *testing.T) {
 	cache := NewGoCache(1, NewLRUPolicy())
 
-	cache.SetWithTTL("key", "value1", 1, Second)
-	cache.SetWithTTL("key", "value2", 1, Second)
+	cache.SetWithTTL("key", "value1", 1)
+	cache.SetWithTTL("key", "value2", 1)
 	value, _ := cache.Get("key")
 
 	if value != "value2" {
 		t.Errorf("expected value to be \"value\", got '%s'", value)
-	}
-}
-
-func TestSetWithTTL_InvalidTime(t *testing.T) {
-	cache := NewGoCache(1, NewLRUPolicy())
-
-	cache.SetWithTTL("key", "value1", 1, 5)
-
-	time.Sleep(2 * time.Second)
-
-	value, _ := cache.Get("key")
-
-	if value != "" {
-		t.Errorf("expected empty string for expired key, got '%s'", value)
 	}
 }
 
@@ -140,7 +126,7 @@ func TestExists(t *testing.T) {
 func TestExists_KeyExpired(t *testing.T) {
 	cache := NewGoCache(1, NewLRUPolicy())
 
-	cache.SetWithTTL("key", "value1", 0, Second)
+	cache.SetWithTTL("key", "value1", 0)
 
 	time.Sleep(1 * time.Second)
 

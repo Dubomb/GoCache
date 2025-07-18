@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-const (
-	Second TimeUnit = iota
-	Minute
-	Hour
-)
-
 type cacheEntry struct {
 	value     string
 	expiresAt time.Time
@@ -54,19 +48,8 @@ func (cache *GoCache) Set(key, value string) {
 	cache.newEntry(key, value, time.Time{})
 }
 
-func (cache *GoCache) SetWithTTL(key, value string, ttl uint, unit TimeUnit) {
-	var duration time.Duration
-
-	switch unit {
-	case Second:
-		duration = time.Duration(ttl) * time.Second
-	case Minute:
-		duration = time.Duration(ttl) * time.Minute
-	case Hour:
-		duration = time.Duration(ttl) * time.Hour
-	default:
-		duration = time.Duration(ttl) * time.Second
-	}
+func (cache *GoCache) SetWithTTL(key, value string, ttl uint) {
+	duration := time.Duration(ttl) * time.Millisecond
 
 	expiresAt := time.Now().Add(duration)
 
