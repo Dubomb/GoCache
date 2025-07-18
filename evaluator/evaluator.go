@@ -11,6 +11,10 @@ func Evaluate(command parser.Command, cache *cache.GoCache) string {
 	case "SET":
 		cache.Set(command.Key, command.Value)
 
+		if len(command.Args) > 2 {
+			cache.SetWithTTL(command.Key, command.Value, command.TTL)
+		}
+
 		return "OK"
 
 	case "GET":

@@ -16,6 +16,7 @@ type Command struct {
 	Type  CommandType
 	Key   string
 	Value string
+	TTL   uint // Milliseconds
 	Args  []string
 }
 
